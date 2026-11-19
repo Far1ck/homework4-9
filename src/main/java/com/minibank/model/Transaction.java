@@ -1,4 +1,4 @@
-package com.minibank;
+package com.minibank.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,4 +24,5 @@ public class Transaction {
     public BigDecimal getAmount() { return amount; }
     public String getType() { return type; }
     public LocalDateTime getTimestamp() { return timestamp; }
+
 }
