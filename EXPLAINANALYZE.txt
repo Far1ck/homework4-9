@@ -1,0 +1,19 @@
+Без индекса:
+Seq Scan on transactions  (cost=0.00..1093.03 rows=2 width=42) (actual time=1.737..1.737 rows=0.00 loops=1)
+  Filter: (account_id = 42)
+  Rows Removed by Filter: 50002
+  Buffers: shared hit=468
+Planning:
+  Buffers: shared hit=5 dirtied=1
+Planning Time: 0.380 ms
+Execution Time: 1.746 ms
+
+C индексом:
+Index Scan using idx_transactions_account_id on transactions  (cost=0.29..8.32 rows=2 width=42) (actual time=0.012..0.013 rows=0.00 loops=1)
+  Index Cond: (account_id = 42)
+  Index Searches: 1
+  Buffers: shared hit=5
+Planning:
+  Buffers: shared hit=26
+Planning Time: 0.101 ms
+Execution Time: 0.023 ms

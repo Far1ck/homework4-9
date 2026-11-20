@@ -1,11 +1,32 @@
 package com.minibank;
 
+import com.minibank.db.ConnectionPool;
+import com.minibank.db.MigrationRunner;
+import com.minibank.model.Account;
+import com.minibank.model.Client;
+import com.minibank.repository.AccountRepository;
+import com.minibank.repository.ClientRepository;
+import com.minibank.repository.TransactionRepository;
+import com.minibank.service.BankService;
+
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
 
 public class Main {
 
-    public static void main(String[] args) {
-        BankService bank = new BankService();
+    public static void main(String[] args) throws SQLException {
+        Runtime.getRuntime().addShutdownHook(new Thread(ConnectionPool::close));
+        DataSource dataSource = ConnectionPool.getDataSource();
+        MigrationRunner.runMigrations(dataSource);
+        AccountRepository accountRepository = new AccountRepository(dataSource);
+        BankService bank = new BankService(
+                dataSource,
+                new ClientRepository(dataSource),
+                accountRepository,
+                new TransactionRepository()
+        );
 
         Client client = bank.registerClient("Ivan Petrov", "ivan@example.com");
         Account account1 = bank.openAccount(client.getId(), "ACC-001");
@@ -16,6 +37,9 @@ public class Main {
         // от несуществующего служебного счёта нет смысла эмулировать,
         // поэтому просто выставим баланс через пакетный доступ в демо:
         account1.setBalance(new BigDecimal("1000.00"));
+        try (Connection conn = dataSource.getConnection()) {
+            accountRepository.updateBalance(conn, account1);
+        }
 
         System.out.println("=== Обычный перевод ===");
         bank.transfer(account1.getId(), account2.getId(), new BigDecimal("100.00"));
