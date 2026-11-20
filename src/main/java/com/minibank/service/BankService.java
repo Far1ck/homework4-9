@@ -89,7 +89,15 @@ public class BankService {
         try (Connection conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
             try {
-                Account from = getAccount(conn, fromAccountId);
+                Account from;
+                Account to;
+                if (fromAccountId < toAccountId) {
+                    from = getAccount(conn, fromAccountId);
+                    to = getAccount(conn, toAccountId);
+                } else {
+                    to = getAccount(conn, toAccountId);
+                    from = getAccount(conn, fromAccountId);
+                }
 
                 // Списываем деньги ДО того, как проверили существование счёта-
                 // получателя — если toAccountId не существует, деньги уже
@@ -101,7 +109,6 @@ public class BankService {
                 accountRepository.updateBalance(conn, from);
                 recordTransaction(conn, fromAccountId, amount.negate(), "TRANSFER_OUT");
 
-                Account to = getAccount(conn, toAccountId); // если бросит исключение — деньги уже пропали
                 to.setBalance(to.getBalance().add(amount));
                 accountRepository.updateBalance(conn, to);
                 recordTransaction(conn, toAccountId, amount, "TRANSFER_IN");
