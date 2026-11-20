@@ -30,7 +30,7 @@ public class ClientRepository {
                             email
                     );
                 }
-                throw new SQLException("Не удалось сохранить клиента");
+                throw new SQLException("Failed to save the client");
             }
         }
     }

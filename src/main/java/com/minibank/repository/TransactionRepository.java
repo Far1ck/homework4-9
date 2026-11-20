@@ -26,7 +26,7 @@ public class TransactionRepository {
                             rs.getTimestamp("transaction_date").toLocalDateTime()
                     );
                 }
-                throw new SQLException("Не удалось сохранить транзакцию");
+                throw new SQLException("Failed to save the transaction");
             }
         }
     }
