@@ -1,5 +1,12 @@
 package com.minibank.service;
 
+import com.minibank.dto.OpenAccountRequest;
+import com.minibank.dto.RegisterClientRequest;
+import com.minibank.dto.TransferRequest;
+import com.minibank.exception.AccountNotFountException;
+import com.minibank.exception.ClientNotFoundException;
+import com.minibank.exception.InsufficientFundsException;
+import com.minibank.exception.NegativeBalanceException;
 import com.minibank.model.Account;
 import com.minibank.model.Client;
 import com.minibank.repository.AccountRepository;
@@ -11,26 +18,6 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 
-/**
- * MiniBank — "MVP", который наспех собрал предыдущий разработчик:
- * вся логика в одном классе, все данные — в HashMap, персистентности
- * нет вообще (перезапуск процесса — и всё пропало).
- *
- * ПРОБЛЕМА (найдёшь и исправишь, когда дойдёт очередь — модуль 7.1,
- * когда появится @Transactional): в transfer() проверка существования
- * счёта-получателя происходит ПОСЛЕ списания денег со счёта-
- * отправителя. Если счёт-получатель не существует, деньги уже спишутся
- * с первого счёта и "исчезнут" — их некуда вернуть, потому что метод
- * прерывается исключением до зачисления.
- *
- * Эта проблема не решается на HashMap "в лоб" без искусственных
- * костылей (можно вручную откатывать баланс в catch, но это не
- * настоящее решение) — она по-настоящему решается только когда
- * появится транзакционность (сначала в БД — ACID, модуль 4, а затем
- * в коде — @Transactional, модуль 7.1). До этого момента баг просто
- * существует и это нормально: то, что появится в модуле 7.1, — как
- * раз тот инструмент, который проблему полностью закрывает.
- */
 public class BankService {
 
     private final DataSource dataSource;
@@ -48,70 +35,60 @@ public class BankService {
         this.transactionRepository = transactionRepository;
     }
 
-    public Client registerClient(String name, String email) throws SQLException {
-        return clientRepository.save(name, email);
+    public Client registerClient(RegisterClientRequest request) throws SQLException {
+        return clientRepository.save(request.name(), request.email());
     }
 
-    public Account openAccount(Long clientId, String accountNumber) throws SQLException {
-        if (!clientRepository.clientIsExist(clientId)) {
-            throw new IllegalArgumentException("Client not found: " + clientId);
+    public Account openAccount(OpenAccountRequest request) throws SQLException, NegativeBalanceException, ClientNotFoundException {
+        if (request.balance().compareTo(BigDecimal.ZERO) < 0) {
+            throw new NegativeBalanceException("Creating an account with a negative balance is impossible");
         }
-        return accountRepository.save(clientId, accountNumber, BigDecimal.ZERO);
-    }
-
-    public Account getAccount(Connection conn, Long accountId) throws SQLException {
-        Account account = accountRepository.findByAccountId(conn, accountId).orElse(null);
-        if (account == null) {
-            throw new IllegalArgumentException("Account not found: " + accountId);
+        if (!clientRepository.clientIsExist(request.clientId())) {
+            throw new ClientNotFoundException("Client not found: " + request.clientId());
         }
-        return account;
+        return accountRepository.save(request.clientId(), request.accountNumber(), request.balance());
     }
 
-    public Account getAccount(Long accountId) throws SQLException {
+    public Account getAccount(Connection conn, Long accountId) throws SQLException, AccountNotFountException {
+        return accountRepository.findByAccountId(conn, accountId).orElseThrow(() -> new AccountNotFountException("Account not found: " + accountId));
+    }
+
+    public Account getAccount(Long accountId) throws SQLException, AccountNotFountException {
         try (Connection conn = dataSource.getConnection()) {
-            Account account = accountRepository.findByAccountId(conn, accountId).orElse(null);
-            if (account == null) {
-                throw new IllegalArgumentException("Account not found: " + accountId);
-            }
-            return account;
+            return accountRepository.findByAccountId(conn, accountId).orElseThrow(() -> new AccountNotFountException("Account not found: " + accountId));
         }
     }
 
-    public Client getClient(Long clientId) throws SQLException {
-        Client client = clientRepository.findByClientId(clientId).orElse(null);
-        if (client == null) {
-            throw new IllegalArgumentException("Client not found: " + clientId);
-        }
-        return client;
+    public Client getClient(Long clientId) throws SQLException, ClientNotFoundException {
+        return clientRepository.findByClientId(clientId).orElseThrow(() -> new ClientNotFoundException("Client not found: " + clientId));
     }
 
-    public void transfer(Long fromAccountId, Long toAccountId, BigDecimal amount) {
+    public void transfer(TransferRequest request) throws AccountNotFountException, NegativeBalanceException, InsufficientFundsException {
         try (Connection conn = dataSource.getConnection()) {
             conn.setAutoCommit(false);
             try {
                 Account from;
                 Account to;
-                if (fromAccountId < toAccountId) {
-                    from = getAccount(conn, fromAccountId);
-                    to = getAccount(conn, toAccountId);
+                if (request.fromAccountId() < request.toAccountId()) {
+                    from = getAccount(conn, request.fromAccountId());
+                    to = getAccount(conn, request.toAccountId());
                 } else {
-                    to = getAccount(conn, toAccountId);
-                    from = getAccount(conn, fromAccountId);
+                    to = getAccount(conn, request.toAccountId());
+                    from = getAccount(conn, request.fromAccountId());
                 }
-
-                // Списываем деньги ДО того, как проверили существование счёта-
-                // получателя — если toAccountId не существует, деньги уже
-                // списаны и потеряны.
-                if (from.getBalance().compareTo(amount) < 0) {
-                    throw new IllegalStateException("Insufficient funds on account " + fromAccountId);
+                if (!(request.amount().compareTo(BigDecimal.ZERO) > 0)) {
+                    throw new NegativeBalanceException("The transfer amount must be greater than 0. Current amount: " + request.amount());
                 }
-                from.setBalance(from.getBalance().subtract(amount));
+                if (from.getBalance().compareTo(request.amount()) < 0) {
+                    throw new InsufficientFundsException("Insufficient funds on account " + request.fromAccountId());
+                }
+                from.setBalance(from.getBalance().subtract(request.amount()));
                 accountRepository.updateBalance(conn, from);
-                recordTransaction(conn, fromAccountId, amount.negate(), "TRANSFER_OUT");
+                recordTransaction(conn, request.fromAccountId(), request.amount().negate(), "TRANSFER_OUT");
 
-                to.setBalance(to.getBalance().add(amount));
+                to.setBalance(to.getBalance().add(request.amount()));
                 accountRepository.updateBalance(conn, to);
-                recordTransaction(conn, toAccountId, amount, "TRANSFER_IN");
+                recordTransaction(conn, request.toAccountId(), request.amount(), "TRANSFER_IN");
                 conn.commit();
             } catch (Exception e) {
                 conn.rollback();

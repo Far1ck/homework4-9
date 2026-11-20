@@ -33,7 +33,7 @@ public class AccountRepository {
                             balance
                     );
                 }
-                throw new SQLException("Не удалось сохранить счет");
+                throw new SQLException("Failed to save the account");
             }
         }
     }
@@ -47,17 +47,7 @@ public class AccountRepository {
             if (rs == 1) {
                 return account;
             }
-            throw new SQLException("Не удалось обновить счет");
-        }
-    }
-
-    public boolean accountIsExist(Connection conn, long accountId) throws SQLException {
-        String sql = "SELECT id, client_id, account_number, balance FROM accounts WHERE id = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(1, accountId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next();
-            }
+            throw new SQLException("Failed to update the account");
         }
     }
 

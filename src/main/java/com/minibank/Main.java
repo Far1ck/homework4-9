@@ -1,62 +1,42 @@
 package com.minibank;
 
+import com.minibank.controller.AccountController;
+import com.minibank.controller.ClientController;
+import com.minibank.controller.TransferController;
 import com.minibank.db.ConnectionPool;
 import com.minibank.db.MigrationRunner;
-import com.minibank.model.Account;
-import com.minibank.model.Client;
 import com.minibank.repository.AccountRepository;
 import com.minibank.repository.ClientRepository;
 import com.minibank.repository.TransactionRepository;
 import com.minibank.service.BankService;
+import com.sun.net.httpserver.HttpServer;
 
 import javax.sql.DataSource;
-import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.SQLException;
+import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.concurrent.Executors;
 
 public class Main {
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws IOException {
         Runtime.getRuntime().addShutdownHook(new Thread(ConnectionPool::close));
         DataSource dataSource = ConnectionPool.getDataSource();
         MigrationRunner.runMigrations(dataSource);
-        AccountRepository accountRepository = new AccountRepository(dataSource);
-        BankService bank = new BankService(
+        BankService bankService = new BankService(
                 dataSource,
                 new ClientRepository(dataSource),
-                accountRepository,
+                new AccountRepository(dataSource),
                 new TransactionRepository()
         );
 
-        Client client = bank.registerClient("Ivan Petrov", "ivan@example.com");
-        Account account1 = bank.openAccount(client.getId(), "ACC-001");
-        Account account2 = bank.openAccount(client.getId(), "ACC-002");
+        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        server.createContext("/client", new ClientController(bankService));
+        server.createContext("/account", new AccountController(bankService));
+        server.createContext("/transfer", new TransferController(bankService));
 
-        // Пополняем account1 "вручную" переводом с самого себя не получится —
-        // для демо просто задаём баланс напрямую через первый перевод
-        // от несуществующего служебного счёта нет смысла эмулировать,
-        // поэтому просто выставим баланс через пакетный доступ в демо:
-        account1.setBalance(new BigDecimal("1000.00"));
-        try (Connection conn = dataSource.getConnection()) {
-            accountRepository.updateBalance(conn, account1);
-        }
+        server.setExecutor(Executors.newCachedThreadPool());
+        server.start();
 
-        System.out.println("=== Обычный перевод ===");
-        bank.transfer(account1.getId(), account2.getId(), new BigDecimal("100.00"));
-        System.out.println("account1 balance: " + bank.getAccount(account1.getId()).getBalance());
-        System.out.println("account2 balance: " + bank.getAccount(account2.getId()).getBalance());
-
-        System.out.println();
-        System.out.println("=== Перевод на несуществующий счёт (баг) ===");
-        BigDecimal balanceBefore = bank.getAccount(account1.getId()).getBalance();
-        try {
-            bank.transfer(account1.getId(), 999L, new BigDecimal("50.00"));
-        } catch (IllegalArgumentException e) {
-            System.out.println("Ошибка (как и ожидалось): " + e.getMessage());
-        }
-        BigDecimal balanceAfter = bank.getAccount(account1.getId()).getBalance();
-        System.out.println("Баланс до попытки перевода: " + balanceBefore);
-        System.out.println("Баланс после попытки перевода: " + balanceAfter);
-        System.out.println("Деньги пропали: " + (balanceAfter.compareTo(balanceBefore) < 0));
+        System.out.println("The server is running on port 8080");
     }
 }
