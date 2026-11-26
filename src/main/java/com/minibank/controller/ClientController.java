@@ -5,7 +5,7 @@ import com.minibank.controller.utils.HttpUtils;
 import com.minibank.dto.RegisterClientRequest;
 import com.minibank.exception.ClientNotFoundException;
 import com.minibank.exception.InvalidPathException;
-import com.minibank.model.Client;
+import com.minibank.entity.Client;
 import com.minibank.service.BankService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;

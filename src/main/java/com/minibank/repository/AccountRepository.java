@@ -1,71 +1,45 @@
 package com.minibank.repository;
 
-import com.minibank.model.Account;
+import com.minibank.db.JpaUtil;
+import com.minibank.entity.Account;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityTransaction;
+import jakarta.persistence.LockModeType;
 
-import javax.sql.DataSource;
-import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.Optional;
 
 public class AccountRepository {
-    private final DataSource dataSource;
 
-    public AccountRepository(DataSource dataSource) {
-        this.dataSource = dataSource;
-    }
-
-    public Account save(long clientId, String accountNumber, BigDecimal balance) throws SQLException {
-        String sql = "INSERT INTO accounts (client_id, account_number, balance) VALUES (?, ?, ?) RETURNING id";
-        try (Connection conn = dataSource.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(1, clientId);
-            stmt.setString(2, accountNumber);
-            stmt.setBigDecimal(3, balance);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return new Account(
-                            rs.getLong("id"),
-                            clientId,
-                            accountNumber,
-                            balance
-                    );
-                }
-                throw new SQLException("Failed to save the account");
+    public Account save(Account account) {
+        EntityManager entityManager = JpaUtil.getEntityManager();
+        EntityTransaction transaction = entityManager.getTransaction();
+        try {
+            transaction.begin();
+            entityManager.persist(account);
+            transaction.commit();
+            return account;
+        } catch (Exception e) {
+            if (transaction != null && transaction.isActive()) {
+                transaction.rollback();
             }
+            throw e;
+        } finally {
+            entityManager.close();
         }
     }
 
-    public Account updateBalance(Connection conn, Account account) throws SQLException {
-        String sql = "UPDATE accounts SET balance = ? WHERE id = ?";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(2, account.getId());
-            stmt.setBigDecimal(1, account.getBalance());
-            int rs = stmt.executeUpdate();
-            if (rs == 1) {
-                return account;
-            }
-            throw new SQLException("Failed to update the account");
-        }
+    public Optional<Account> findByIdForUpdate(EntityManager em, Long id) {
+        return Optional.ofNullable(em.find(Account.class, id, LockModeType.PESSIMISTIC_WRITE));
     }
 
-    public Optional<Account> findByAccountId(Connection conn, long accountId) throws SQLException {
-        String sql = "SELECT id, client_id, account_number, balance FROM accounts WHERE id = ? FOR UPDATE";
-        try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-            stmt.setLong(1, accountId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(new Account(
-                            rs.getLong("id"),
-                            rs.getLong("client_id"),
-                            rs.getString("account_number"),
-                            rs.getBigDecimal("balance")
-                    ));
-                }
-            }
+    public Optional<Account> findById(Long accountId) {
+        try (EntityManager em = JpaUtil.getEntityManager()) {
+            Account account = em.createQuery("SELECT a FROM Account a JOIN FETCH a.client WHERE a.id = :id", Account.class)
+                    .setParameter("id", accountId)
+                    .getSingleResult();
+            return Optional.of(account);
+        } catch (Exception e) {
+            return Optional.empty();
         }
-        return Optional.empty();
     }
 }

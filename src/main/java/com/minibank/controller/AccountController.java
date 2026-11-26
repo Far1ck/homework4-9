@@ -6,7 +6,7 @@ import com.minibank.dto.OpenAccountRequest;
 import com.minibank.exception.AccountNotFountException;
 import com.minibank.exception.ClientNotFoundException;
 import com.minibank.exception.InvalidPathException;
-import com.minibank.model.Account;
+import com.minibank.entity.Account;
 import com.minibank.service.BankService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;

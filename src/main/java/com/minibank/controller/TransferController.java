@@ -42,7 +42,7 @@ public class TransferController implements HttpHandler {
             bankService.transfer(req);
             HttpUtils.sendJson(exchange, 200, Map.of("status", "The funds have been successfully transferred"));
 
-        } catch (InsufficientFundsException | NegativeBalanceException e) {
+        } catch (InsufficientFundsException | NegativeBalanceException | IllegalArgumentException e) {
             log.warn(e.getMessage());
             HttpUtils.sendError(exchange, 400, e.getMessage());
         } catch (AccountNotFountException e) {
