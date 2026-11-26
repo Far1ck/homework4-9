@@ -5,7 +5,7 @@ import com.minibank.controller.utils.HttpUtils;
 import com.minibank.dto.RegisterClientRequest;
 import com.minibank.exception.ClientNotFoundException;
 import com.minibank.exception.InvalidPathException;
-import com.minibank.model.Client;
+import com.minibank.entity.Client;
 import com.minibank.service.BankService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 public class ClientController implements HttpHandler {
     private static final Logger log = LoggerFactory.getLogger(ClientController.class);
@@ -39,9 +40,14 @@ public class ClientController implements HttpHandler {
                 HttpUtils.sendJson(exchange, 201, client);
 
             } else if ("GET".equals(method)) {
-                Long clientId = HttpUtils.extractId(exchange, BASE_PATH);
-                Client client = bankService.getClient(clientId);
-                HttpUtils.sendJson(exchange, 200, client);
+                if (HttpUtils.isExactPath(exchange, BASE_PATH)) {
+                    List<Client> result = bankService.getClients();
+                    HttpUtils.sendJson(exchange, 200, result);
+                } else {
+                    Long clientId = HttpUtils.extractId(exchange, BASE_PATH);
+                    Client client = bankService.getClient(clientId);
+                    HttpUtils.sendJson(exchange, 200, client);
+                }
             } else {
                 HttpUtils.sendError(exchange, 405, "Method not supported");
             }

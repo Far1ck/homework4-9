@@ -3,7 +3,7 @@ package com.minibank;
 import com.minibank.controller.AccountController;
 import com.minibank.controller.ClientController;
 import com.minibank.controller.TransferController;
-import com.minibank.db.ConnectionPool;
+import com.minibank.db.JpaUtil;
 import com.minibank.db.MigrationRunner;
 import com.minibank.repository.AccountRepository;
 import com.minibank.repository.ClientRepository;
@@ -11,7 +11,6 @@ import com.minibank.repository.TransactionRepository;
 import com.minibank.service.BankService;
 import com.sun.net.httpserver.HttpServer;
 
-import javax.sql.DataSource;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
@@ -19,13 +18,15 @@ import java.util.concurrent.Executors;
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        Runtime.getRuntime().addShutdownHook(new Thread(ConnectionPool::close));
-        DataSource dataSource = ConnectionPool.getDataSource();
-        MigrationRunner.runMigrations(dataSource);
+        Runtime.getRuntime().addShutdownHook(new Thread(JpaUtil::close));
+        MigrationRunner.runMigrations(
+                "jdbc:postgresql://localhost:5432/minibank",
+                "globus_student",
+                "secret");
+        JpaUtil.init();
         BankService bankService = new BankService(
-                dataSource,
-                new ClientRepository(dataSource),
-                new AccountRepository(dataSource),
+                new ClientRepository(),
+                new AccountRepository(),
                 new TransactionRepository()
         );
 

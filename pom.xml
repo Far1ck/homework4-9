@@ -28,9 +28,9 @@
             <version>5.0.4</version>
         </dependency>
         <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>7.0.2</version>
+            <groupId>org.hibernate.orm</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>6.6.4.Final</version>
         </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>

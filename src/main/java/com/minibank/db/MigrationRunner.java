@@ -6,8 +6,8 @@ import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.resource.ClassLoaderResourceAccessor;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.DriverManager;
 
 public final class MigrationRunner {
     private static final String CHANGELOG_PATH = "db/changelog/db.changelog-master.yaml";
@@ -15,8 +15,8 @@ public final class MigrationRunner {
     private MigrationRunner() {
     }
 
-    public static void runMigrations(DataSource dataSource) {
-        try (Connection conn = dataSource.getConnection()) {
+    public static void runMigrations(String url, String user, String password) {
+        try (Connection conn = DriverManager.getConnection(url, user, password)) {
             Database database = DatabaseFactory.getInstance()
                     .findCorrectDatabaseImplementation(new JdbcConnection(conn));
 
