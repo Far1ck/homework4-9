@@ -5,7 +5,7 @@ import com.minibank.entity.Client;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityTransaction;
 
-import java.sql.SQLException;
+import java.util.List;
 import java.util.Optional;
 
 public class ClientRepository {
@@ -34,9 +34,10 @@ public class ClientRepository {
         }
     }
 
-    public boolean clientIsExist(long clientId) throws SQLException {
+    public List<Client> findAllClients() {
         try (EntityManager em = JpaUtil.getEntityManager()) {
-            return em.find(Client.class, clientId) != null;
+            return em.createQuery("SELECT c FROM Client c JOIN FETCH c.accounts", Client.class)
+                    .getResultList();
         }
     }
 }

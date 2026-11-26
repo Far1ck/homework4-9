@@ -19,6 +19,7 @@ import jakarta.persistence.EntityTransaction;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Objects;
 
 public class BankService {
@@ -37,6 +38,10 @@ public class BankService {
 
     public Client registerClient(RegisterClientRequest request) {
         return clientRepository.save(new Client(null, request.name(), request.email()));
+    }
+
+    public List<Client> getClients() {
+        return clientRepository.findAllClients();
     }
 
     public Account openAccount(OpenAccountRequest request) throws NegativeBalanceException, ClientNotFoundException {

@@ -1,5 +1,6 @@
 package com.minibank.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.proxy.HibernateProxy;
 
@@ -16,6 +17,7 @@ public class Account {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
+    @JsonIgnore
     private Client client;
     @Column(name = "account_number", nullable = false, unique = true)
     private String accountNumber;
